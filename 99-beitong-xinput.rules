@@ -1,2 +1,2 @@
-# Beitong KP20A/KP40A (XInput modu) takıldığında Switch moduna düşmesini engelle
+# Keep Beitong KP20A/KP40A (XInput mode) from falling back to Switch mode when plugged in
 ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="20bc", ATTR{idProduct}=="5127", RUN+="/usr/local/bin/beitong-xinput-lock $env{DEVNAME}"

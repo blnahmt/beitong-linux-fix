@@ -1,65 +1,65 @@
-# Beitong BTP-KP40 – Linux'ta XInput (Xbox) modu düzeltmesi
+# Beitong BTP-KP40 – XInput (Xbox) mode fix for Linux
 
-## Sorun
-Dongle takılınca kumanda önce `20bc:5127 BTP-KP40A XINPUT` olarak bağlanıyor,
-~1,5 sn sonra kopup `057e:2009 BTP-KP40 NS` (Switch modu) olarak geri geliyor.
+## Problem
+When the dongle is plugged in, the controller first enumerates as `20bc:5127 BTP-KP40A XINPUT`,
+then disconnects after ~1.5 s and comes back as `057e:2009 BTP-KP40 NS` (Switch mode).
 
-**Neden:** Kumanda, Windows'un gönderdiği iki "Microsoft OS descriptor" isteğini
-(string `0xEE` + XUSB10 compat ID) ~1,9 sn içinde görmezse Switch moduna geçiyor.
-Linux `xpad` sürücüsü bu istekleri göndermiyor (kernel 7.2.7 itibarıyla).
-Düzelten kernel yaması henüz ana çekirdekte yok:
+**Cause:** If the controller does not see the two "Microsoft OS descriptor" requests that
+Windows sends (string `0xEE` + XUSB10 compat ID) within ~1.9 s, it switches to Switch mode.
+The Linux `xpad` driver does not send these requests (as of kernel 7.2.7).
+The kernel patch that fixes this is not in mainline yet:
 <https://lkml.iu.edu/hypermail/linux/kernel/2607.3/03645.html>
 
-**Çözüm:** Kumanda bağlanır bağlanmaz bu iki isteği gönderen bir udev kuralı + küçük betik.
+**Fix:** A udev rule + small script that sends those two requests as soon as the controller connects.
 
-## Kurulum
+## Installation
 
-Bu klasörde iki dosya olmalı: `beitong-xinput-lock` ve `99-beitong-xinput.rules`.
-Klasör yoksa aşağıdaki "Dosyaların içeriği" bölümünden yeniden oluştur.
+This folder should contain two files: `beitong-xinput-lock` and `99-beitong-xinput.rules`.
+If they are missing, recreate them from the "File contents" section below.
 
 ```sh
-cd ~/beitong-fix
+cd beitong-linux-fix
 sudo install -m755 beitong-xinput-lock /usr/local/bin/
 sudo install -m644 99-beitong-xinput.rules /etc/udev/rules.d/
 sudo udevadm control --reload
 ```
 
-Gereksinim: sadece `python3` (ek paket gerekmiyor). `xpad` modülü çekirdekte hazır geliyor.
+Requirements: only `python3` (no extra packages). The `xpad` module ships with the kernel.
 
-## Test
-Dongle'ı çıkar, tekrar tak:
+## Testing
+Unplug the dongle and plug it back in:
 
 ```sh
-journalctl -b | grep beitong-xinput-lock   # "ok, compat=b'XUSB10..'" görünmeli
-lsusb | grep -iE 'beitong|20bc|057e'       # 20bc:5127 kalmalı, 057e:2009'a dönmemeli
+journalctl -b | grep beitong-xinput-lock   # should show "ok, compat=b'XUSB10..'"
+lsusb | grep -iE 'beitong|20bc|057e'       # should stay 20bc:5127, not switch to 057e:2009
 ```
 
-Sorun sürerse: `journalctl -k -b | tail -40` çıktısına bak.
+If it still fails, check the output of `journalctl -k -b | tail -40`.
 
-## Kaldırma
-Yama çekirdeğe girdiğinde (ya da artık gerekmezse):
+## Removal
+Once the patch lands in the kernel (or if you no longer need it):
 
 ```sh
 sudo rm /usr/local/bin/beitong-xinput-lock /etc/udev/rules.d/99-beitong-xinput.rules
 sudo udevadm control --reload
 ```
 
-Yamanın çekirdekte olup olmadığını kontrol etmek için:
+To check whether your kernel already includes the patch:
 ```sh
 zstdcat /lib/modules/$(uname -r)/kernel/drivers/input/joystick/xpad.ko.zst | strings | grep -i beitong
 ```
-(Çıktı varsa yama girmiştir.)
+(Any output means the patch is included.)
 
-## Dosyaların içeriği (yedek)
+## File contents (backup)
 
 ### `/usr/local/bin/beitong-xinput-lock`
 ```python
 #!/usr/bin/env python3
-# Beitong KP20/KP40 XInput modunu kilitler.
-# Kumanda, host'tan Microsoft OS descriptor isteklerini ~1.9 sn içinde görmezse
-# Switch (057e:2009) moduna geçiyor. Windows bunları otomatik gönderir, Linux xpad
-# (henüz) göndermez. Bu betik aynı iki isteği usbfs üzerinden gönderir.
-# Kullanım: beitong-xinput-lock /dev/bus/usb/BBB/DDD
+# Locks Beitong KP20/KP40 controllers into XInput mode.
+# If the controller does not receive the Microsoft OS descriptor requests from the
+# host within ~1.9 s, it switches to Switch mode (057e:2009). Windows sends these
+# automatically; Linux xpad does not (yet). This script sends the same two requests via usbfs.
+# Usage: beitong-xinput-lock /dev/bus/usb/BBB/DDD
 import ctypes, fcntl, os, sys, syslog
 
 class CtrlTransfer(ctypes.Structure):
@@ -95,9 +95,9 @@ main()
 
 ### `/etc/udev/rules.d/99-beitong-xinput.rules`
 ```
-# Beitong KP20A/KP40A (XInput modu) takıldığında Switch moduna düşmesini engelle
+# Keep Beitong KP20A/KP40A (XInput mode) from falling back to Switch mode when plugged in
 ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="20bc", ATTR{idProduct}=="5127", RUN+="/usr/local/bin/beitong-xinput-lock $env{DEVNAME}"
 ```
 
-## Alternatif
-Yamalı xpad sürücüsü (DKMS değil, elle derleme): <https://github.com/VegetablCat/Betop-driver-for-linux>
+## Alternative
+Patched xpad driver (manual build, not DKMS): <https://github.com/VegetablCat/Betop-driver-for-linux>

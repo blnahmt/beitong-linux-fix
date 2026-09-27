@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# Beitong KP20/KP40 XInput modunu kilitler.
-# Kumanda, host'tan Microsoft OS descriptor isteklerini ~1.9 sn içinde görmezse
-# Switch (057e:2009) moduna geçiyor. Windows bunları otomatik gönderir, Linux xpad
-# (henüz) göndermez. Bu betik aynı iki isteği usbfs üzerinden gönderir.
-# Kullanım: beitong-xinput-lock /dev/bus/usb/BBB/DDD
+# Locks Beitong KP20/KP40 controllers into XInput mode.
+# If the controller does not receive the Microsoft OS descriptor requests from the
+# host within ~1.9 s, it switches to Switch mode (057e:2009). Windows sends these
+# automatically; Linux xpad does not (yet). This script sends the same two requests via usbfs.
+# Usage: beitong-xinput-lock /dev/bus/usb/BBB/DDD
 import ctypes, fcntl, os, sys, syslog
 
 class CtrlTransfer(ctypes.Structure):
