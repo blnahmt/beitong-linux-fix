@@ -1,0 +1,2 @@
+# Beitong KP20A/KP40A (XInput modu) takıldığında Switch moduna düşmesini engelle
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="20bc", ATTR{idProduct}=="5127", RUN+="/usr/local/bin/beitong-xinput-lock $env{DEVNAME}"
